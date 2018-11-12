@@ -538,7 +538,7 @@ class riscv_processor_t(processor_t):
                 insn.itype = self.itype_ecall
         else:
             insn.itype = [
-                self.itype_csrrw, self.itype_csrrs, self.itype_csrrc,
+                self.itype_csrrw, self.itype_csrrs, self.itype_csrrc, self.itype_null,
                 self.itype_csrrwi, self.itype_csrrsi, self.itype_csrrci
             ][funct3-1]
             i = ord(insn.insnpref) | RV_INSN_CSR
