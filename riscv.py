@@ -253,7 +253,7 @@ class riscv_processor_t(processor_t):
         {'name': 'csrci',       'feature': CF_CHG1 | CF_USE2}
     ]
     instruc_start = 0
-    instruc_end = len(instruc) - 1
+    instruc_end = len(instruc)
 
     real_width = (0, 0, 0, 0)
 
