@@ -42,7 +42,9 @@ RV_BRANCH = 0b1100011
 RV_LOAD = 0b0000011
 RV_STORE = 0b0100011
 RV_IMM = 0b0010011
+RV_IMM32 = 0b0011011
 RV_OP = 0b0110011
+RV_OP32 = 0b0111011
 RV_MISC_MEM = 0b0001111
 RV_SYSTEM = 0b1110011
 RV_AMO = 0b0101111
@@ -523,7 +525,47 @@ class riscv_processor_t(processor_t):
                 self.itype_ori, self.itype_andi
             ][funct3]
 
+    def decode_IMM32(self, insn, opcode):
+        self.op_reg(insn.Op1, self.decode_rd(opcode))
+        self.op_reg(insn.Op2, self.decode_rs1(opcode))
+        funct3 = self.decode_funct3(opcode)
+        imm = self.decode_i_imm(opcode)
+        if funct3 == 0b001:
+            self.op_imm(insn.Op3, imm & 0b11111)
+            insn.itype = self.itype_slli
+        elif funct3 == 0b101:
+            self.op_imm(insn.Op3, imm & 0b11111)
+            insn.itype = self.itype_srai if imm & 0x400 == 0x400 else self.itype_srli
+        else:
+            self.op_imm(insn.Op3, imm)
+            insn.itype = [
+                self.itype_addi, 0, self.itype_slti,
+                self.itype_sltiu, self.itype_xori, 0,
+                self.itype_ori, self.itype_andi
+            ][funct3]
+
     def decode_OP(self, insn, opcode):
+        self.op_reg(insn.Op1, self.decode_rd(opcode))
+        self.op_reg(insn.Op2, self.decode_rs1(opcode))
+        self.op_reg(insn.Op3, self.decode_rs2(opcode))
+        funct7 = self.decode_funct7(opcode)
+        insn.itype = [
+            [
+                self.itype_add, self.itype_sll, self.itype_slt, self.itype_sltu,
+                self.itype_xor, self.itype_slr, self.itype_or, self.itype_and
+            ],
+            [
+                self.itype_mul, self.itype_mulh, self.itype_mulhsu, self.itype_mulhu,
+                self.itype_div, self.itype_divu, self.itype_rem, self.itype_remu
+            ]
+        ][funct7 & 0b1][self.decode_funct3(opcode)]
+        if funct7 & 0b0100001 == 0b0100000:
+            if insn.itype == self.itype_add:
+                insn.itype = self.itype_sub
+            elif insn.itype == self.itype_slr:
+                insn.itype = self.itype_sra
+
+    def decode_OP32(self, insn, opcode):
         self.op_reg(insn.Op1, self.decode_rd(opcode))
         self.op_reg(insn.Op2, self.decode_rs1(opcode))
         self.op_reg(insn.Op3, self.decode_rs2(opcode))
@@ -1165,7 +1207,9 @@ class riscv_processor_t(processor_t):
             RV_LOAD: self.decode_LOAD,
             RV_STORE: self.decode_STORE,
             RV_IMM: self.decode_IMM,
+            RV_IMM32: self.decode_IMM32,
             RV_OP: self.decode_OP,
+            RV_OP32: self.decode_OP32,
             RV_MISC_MEM: self.decode_MISC_MEM,
             RV_SYSTEM: self.decode_SYSTEM,
             RV_AMO: self.decode_AMO,
