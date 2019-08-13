@@ -231,8 +231,8 @@ class riscv_processor_t(processor_t):
         {'name': 'bgtz',    'feature': CF_USE1 | CF_USE2 | CF_JUMP},
 
         # jump/call pseudo-instructions
-        {'name': 'j',       'feature': CF_USE1 | CF_JUMP},
-        {'name': 'jr',      'feature': CF_USE1 | CF_JUMP},
+        {'name': 'j',       'feature': CF_USE1 | CF_JUMP | CF_STOP},
+        {'name': 'jr',      'feature': CF_USE1 | CF_JUMP | CF_STOP},
         {'name': 'ret',     'feature': CF_STOP},
         {'name': 'call',    'feature': CF_USE1 | CF_CALL},
         {'name': 'tail',    'feature': CF_USE1 | CF_CALL},
