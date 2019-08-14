@@ -361,6 +361,10 @@ class riscv_processor_t(processor_t):
             0xB00: 'mcycle',
             0xB02: 'minstret',
 
+            # Machine Counters / Timers, RV32I only
+            0xB80: 'mcycleh',
+            0xB82: 'minstreth',
+
             # Machine Information Registers
             0xF11: 'mvendorid',
             0xF12: 'marchid',
