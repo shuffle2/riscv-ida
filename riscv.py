@@ -31,6 +31,8 @@ def is_reg(op, regNo):
     return op.reg == regNo
 
 # is sp delta fixed by the user?
+
+
 def is_fixed_spd(ea):
     return (get_aflags(ea) & AFL_FIXEDSPD) != 0
 
@@ -468,7 +470,8 @@ class riscv_processor_t(processor_t):
 
     def decode_AUIPC(self, insn, opcode):
         self.op_reg(insn.Op1, self.decode_rd(opcode))
-        self.op_imm(insn.Op2, insn.ip + self.decode_u_imm(opcode), signed=False)
+        self.op_imm(insn.Op2, insn.ip +
+                    self.decode_u_imm(opcode), signed=False)
         insn.itype = self.itype_auipc
 
     def decode_JAL(self, insn, opcode):
@@ -479,7 +482,8 @@ class riscv_processor_t(processor_t):
 
     def decode_JALR(self, insn, opcode):
         self.op_reg(insn.Op1, self.decode_rd(opcode))
-        self.op_displ(insn.Op2, self.decode_rs1(opcode), self.decode_i_imm(opcode))
+        self.op_displ(insn.Op2, self.decode_rs1(
+            opcode), self.decode_i_imm(opcode))
         insn.itype = self.itype_jalr
 
     def decode_BRANCH(self, insn, opcode):
@@ -493,26 +497,29 @@ class riscv_processor_t(processor_t):
             self.itype_bltu, self.itype_bgeu
         ][self.decode_funct3(opcode)]
 
-
     def decode_LOAD(self, insn, opcode):
         funct3 = self.decode_funct3(opcode)
         optbl = [
             [self.itype_lb, dt_byte], [self.itype_lh, dt_word],
             [self.itype_lw, dt_dword], [self.itype_ld, dt_qword],
-            [self.itype_lbu, dt_byte], [self.itype_lhu, dt_word], [self.itype_lwu, dt_dword]
+            [self.itype_lbu, dt_byte], [self.itype_lhu,
+                                        dt_word], [self.itype_lwu, dt_dword]
         ]
         insn.itype = optbl[funct3][0]
         self.op_reg(insn.Op1, self.decode_rd(opcode))
-        self.op_displ(insn.Op2, self.decode_rs1(opcode), self.decode_i_imm(opcode), optbl[funct3][1])
+        self.op_displ(insn.Op2, self.decode_rs1(opcode),
+                      self.decode_i_imm(opcode), optbl[funct3][1])
 
     def decode_STORE(self, insn, opcode):
         funct3 = self.decode_funct3(opcode)
         optbl = [
-            [self.itype_sb, dt_byte], [self.itype_sh, dt_word], [self.itype_sw, dt_dword],
+            [self.itype_sb, dt_byte], [self.itype_sh,
+                                       dt_word], [self.itype_sw, dt_dword],
             [self.itype_sd, dt_qword]
         ]
         self.op_reg(insn.Op1, self.decode_rs2(opcode))
-        self.op_displ(insn.Op2, self.decode_rs1(opcode), self.decode_s_imm(opcode), optbl[funct3][1])
+        self.op_displ(insn.Op2, self.decode_rs1(opcode),
+                      self.decode_s_imm(opcode), optbl[funct3][1])
         insn.itype = optbl[funct3][0]
 
     def decode_IMM(self, insn, opcode):
@@ -587,7 +594,6 @@ class riscv_processor_t(processor_t):
                 self.op_imm(insn.Op3, rs1_zimm, signed=False)
             self.op_imm(insn.Op2, imm, signed=False, csr=True)
 
-
     def decode_AMO(self, insn, opcode):
         rd = self.decode_rd(opcode)
         rs1 = self.decode_rs1(opcode)
@@ -661,7 +667,7 @@ class riscv_processor_t(processor_t):
         funct2 = BITS(opcode, 25, 26)
 
         insn.itype = [
-            self.itype_fmadd, self.itype_fmsub, \
+            self.itype_fmadd, self.itype_fmsub,
             self.itype_fnmsub, self.itype_fnmadd
         ][BITS(opcode, 2, 3)]
         self.set_postfix1(insn, RV_AUX_S if funct2 == 0 else RV_AUX_D)
@@ -688,7 +694,8 @@ class riscv_processor_t(processor_t):
 
         if sel < 4:
             # fadd, fsub, fmul, fdiv
-            insn.itype = [self.itype_fadd, self.itype_fsub, self.itype_fmul, self.itype_fdiv][sel]
+            insn.itype = [self.itype_fadd, self.itype_fsub,
+                          self.itype_fmul, self.itype_fdiv][sel]
             self.op_reg(insn.Op1, rd + 32, dtype)
             self.op_reg(insn.Op2, rs1 + 32, dtype)
             self.op_reg(insn.Op3, rs2 + 32, dtype)
@@ -699,13 +706,15 @@ class riscv_processor_t(processor_t):
             self.op_reg(insn.Op2, rs1 + 32, dtype)
         elif sel == 0b00100:
             # fsgnj, fsgnjn, fsgnjx
-            insn.itype = [self.itype_fsgnj, self.itype_fsgnjn, self.itype_fsgnjx][funct3]
+            insn.itype = [self.itype_fsgnj,
+                          self.itype_fsgnjn, self.itype_fsgnjx][funct3]
             self.op_reg(insn.Op1, rd + 32, dtype)
             self.op_reg(insn.Op2, rs1 + 32, dtype)
             self.op_reg(insn.Op3, rs2 + 32, dtype)
         elif sel == 0b10100:
             # feq, flt, fle
-            insn.itype = [self.itype_fle, self.itype_flt, self.itype_feq][funct3]
+            insn.itype = [self.itype_fle,
+                          self.itype_flt, self.itype_feq][funct3]
             self.op_reg(insn.Op1, rd, dt_qword if __EA64__ else dt_dword)
             self.op_reg(insn.Op2, rs1 + 32, dtype)
             self.op_reg(insn.Op3, rs2 + 32, dtype)
@@ -726,7 +735,8 @@ class riscv_processor_t(processor_t):
         elif sel == 0b11010 or sel == 0b11000:
             cvtsel = BIT(sel, 1)
             # fcvt[.w|.wu|.l|.lu][.s] or fcvt[.s][.w|.wu|.l|.lu]
-            optbl = [[RV_AUX_W, dt_dword], [RV_AUX_WU, dt_dword], [RV_AUX_L, dt_qword], [RV_AUX_LU, dt_qword]]
+            optbl = [[RV_AUX_W, dt_dword], [RV_AUX_WU, dt_dword],
+                     [RV_AUX_L, dt_qword], [RV_AUX_LU, dt_qword]]
             cvttbl = [
                 [rd, rs1+32, optbl[rs2][1], dtype, optbl[rs2][0], sz_postfix],
                 [rd+32, rs1, dtype, optbl[rs2][1], sz_postfix, optbl[rs2][0]]
@@ -742,19 +752,22 @@ class riscv_processor_t(processor_t):
                 if cvtsel == 0:
                     # fclass
                     insn.itype = self.itype_fclass
-                    self.op_reg(insn.Op1, rd, dt_qword if __EA64__ else dt_dword)
+                    self.op_reg(
+                        insn.Op1, rd, dt_qword if __EA64__ else dt_dword)
                     self.op_reg(insn.Op2, rs1 + 32, dtype)
             else:
                 # fmv[.w|.d][.x] or fmv[.x][.w|.d]
                 insn.itype = self.itype_fmv
                 if cvtsel == 0:
-                    self.op_reg(insn.Op1, rd, dt_qword if __EA64__ else dt_dword)
+                    self.op_reg(
+                        insn.Op1, rd, dt_qword if __EA64__ else dt_dword)
                     self.op_reg(insn.Op2, rs1+32, dtype)
                     postfix1 = RV_AUX_X
                     postfix2 = RV_AUX_W if dtype == dt_float else RV_AUX_D
                 else:
                     self.op_reg(insn.Op1, rd+32, dtype)
-                    self.op_reg(insn.Op2, rs1, dt_qword if __EA64__ else dt_dword)
+                    self.op_reg(insn.Op2, rs1,
+                                dt_qword if __EA64__ else dt_dword)
                     postfix1 = RV_AUX_W if dtype == dt_float else RV_AUX_D
                     postfix2 = RV_AUX_X
 
@@ -794,7 +807,8 @@ class riscv_processor_t(processor_t):
                 if decoder[0] != self.itype_null:
                     insn.itype = decoder[0]
                     self.op_reg(insn.Op1, decoder[2][rd_rs2])
-                    self.op_displ(insn.Op2, self.ciregs[rs1], decoder[1](opcode))
+                    self.op_displ(
+                        insn.Op2, self.ciregs[rs1], decoder[1](opcode))
             else:
                 insn.itype = self.itype_addi
                 imm = (BIT(opcode, 5) << 3) | (BIT(opcode, 6) << 2) | \
@@ -838,7 +852,8 @@ class riscv_processor_t(processor_t):
                 # C.ADDI16SP variant
                 if rs1_rd == 2:
                     imm = (BIT(opcode, 2) << 5) | (BITS(opcode, 3, 4) << 7) | \
-                          (BIT(opcode, 5) << 6) | (BIT(opcode, 6) << 4) | (BIT(opcode, 12) << 9)
+                          (BIT(opcode, 5) << 6) | (
+                              BIT(opcode, 6) << 4) | (BIT(opcode, 12) << 9)
                     if is_signed:
                         imm = SIGNEXT(imm, 10)
                     self.op_reg(insn.Op1, self.ireg_sp)
@@ -861,12 +876,14 @@ class riscv_processor_t(processor_t):
                 self.op_reg(insn.Op1, self.ciregs[rs1_rd])
                 self.op_reg(insn.Op2, self.ciregs[rs1_rd])
                 if sel1 < 3:
-                    insn.itype = [self.itype_srli, self.itype_srai, self.itype_andi][sel1]
+                    insn.itype = [self.itype_srli,
+                                  self.itype_srai, self.itype_andi][sel1]
                     if sel1 < 2:
                         imm = imm & 0b11111 if imm != 0 else 64
                     self.op_imm(insn.Op3, imm)
                 elif sel1 == 0b11:
-                    insn.itype =[self.itype_sub, self.itype_xor, self.itype_or, self.itype_and][sel2]
+                    insn.itype = [self.itype_sub, self.itype_xor,
+                                  self.itype_or, self.itype_and][sel2]
                     self.op_reg(insn.Op3, self.ciregs[rs2])
                     if BIT(opcode, 12) == 1:
                         if insn.itype == self.itype_sub:
@@ -885,7 +902,7 @@ class riscv_processor_t(processor_t):
                 insn.itype = self.itype_jal
             elif copcode > 0b101:
                 insn.itype = [self.itype_beq, self.itype_bne][copcode - 0b110]
-                imm = (BIT(opcode, 2) << 5) | (BITS(opcode, 3,4) << 1) | (BITS(opcode, 5, 6) << 6) | \
+                imm = (BIT(opcode, 2) << 5) | (BITS(opcode, 3, 4) << 1) | (BITS(opcode, 5, 6) << 6) | \
                       (BITS(opcode, 10, 11) << 3) | (BIT(opcode, 12) << 8)
                 if is_signed:
                     imm = SIGNEXT(imm, 9)
@@ -907,12 +924,14 @@ class riscv_processor_t(processor_t):
                 self.op_displ(insn.Op2, self.ireg_sp, imm)
                 insn.itype = self.itype_fld
             elif copcode == 0b010:
-                imm = (BITS(opcode, 2, 3) << 6) | (BITS(opcode, 4, 6) << 2) | (BIT(opcode, 12) << 5)
+                imm = (BITS(opcode, 2, 3) << 6) | (
+                    BITS(opcode, 4, 6) << 2) | (BIT(opcode, 12) << 5)
                 self.op_reg(insn.Op1, rs1_rd)
                 self.op_displ(insn.Op2, self.ireg_sp, imm)
                 insn.itype = self.itype_lw
             elif copcode == 0b011:
-                imm = (BITS(opcode, 2, 4) << 6) | (BITS(opcode, 3, 4) << 3) | (BIT(opcode, 12) << 5)
+                imm = (BITS(opcode, 2, 4) << 6) | (
+                    BITS(opcode, 3, 4) << 3) | (BIT(opcode, 12) << 5)
                 self.op_reg(insn.Op1, rs1_rd+32)
                 self.op_displ(insn.Op2, self.ireg_sp, imm)
                 insn.itype = self.itype_flw
@@ -1233,7 +1252,7 @@ class riscv_processor_t(processor_t):
         ]
 
     # TODO: setup loader hooks and inject correct ELF type
-    #def ev_init(self, idp_file):
+    # def ev_init(self, idp_file):
     #    return 0
 
     def ev_get_frame_retsize(self, frsize, pfn):
@@ -1250,7 +1269,7 @@ class riscv_processor_t(processor_t):
         if opcode in self.maj_opcodes or (opcode & RV_C_MASK != RV_C_MASK):
             return 1
         return -1
-    
+
     def trace_sp(self, insn):
         """
         Trace the value of the SP and create an SP change point if the current
@@ -1263,7 +1282,7 @@ class riscv_processor_t(processor_t):
         # have always seen `addi sp, sp, <simm>` used for prologue/epilogue
         # `add/sub sp, sp, <reg>` used for variable sized arrays
         if insn.itype == self.itype_addi and insn.Op1.is_reg(self.ireg_sp) and \
-            insn.Op2.is_reg(self.ireg_sp) and insn.Op3.type == o_imm:
+                insn.Op2.is_reg(self.ireg_sp) and insn.Op3.type == o_imm:
             spofs = insn.Op3.value
             if insn.Op3.specflag1 & RV_OP_FLAG_SIGNED:
                 spofs = fix_sign_32(spofs)
@@ -1299,7 +1318,7 @@ class riscv_processor_t(processor_t):
         flow = feats & CF_STOP == 0
         if flow:
             add_cref(insn.ea, insn.ea + insn.size, fl_F)
-        
+
         # trace the stack pointer if:
         #   - it is the second analysis pass
         #   - the stack pointer tracing is allowed
@@ -1307,7 +1326,8 @@ class riscv_processor_t(processor_t):
             if flow:
                 self.trace_sp(insn)     # trace modification of SP register
             else:
-                idc.recalc_spd(insn.ea) # recalculate SP register for the next insn
+                # recalculate SP register for the next insn
+                idc.recalc_spd(insn.ea)
 
         return True
 
@@ -1317,7 +1337,8 @@ class riscv_processor_t(processor_t):
             ctx.out_register(self.reg_names[op.reg])
         elif optype == o_imm:
             if op.specflag1 & RV_OP_FLAG_CSR == RV_OP_FLAG_CSR:
-                ctx.out_register(self.csr_names.get(op.value, 'csr_%x' % (op.value)))
+                ctx.out_register(self.csr_names.get(
+                    op.value, 'csr_%x' % (op.value)))
             else:
                 opflag = OOFW_IMM | OOFW_32 | OOF_NUMBER
                 if op.specflag1 & RV_OP_FLAG_SIGNED == RV_OP_FLAG_SIGNED:
@@ -1364,7 +1385,7 @@ class riscv_processor_t(processor_t):
         if ctx.insn.Op1.type != o_void:
             ctx.out_one_operand(0)
 
-        for i in range(1,4):
+        for i in range(1, 4):
             if ctx.insn[i].type == o_void:
                 break
             ctx.out_symbol(',')
