@@ -1,4 +1,6 @@
 from idaapi import *
+import ida_frame
+import idc
 
 # keeping __EA64__ name for historical reasons
 __EA64__ = BADADDR == 0xFFFFFFFFFFFFFFFF
@@ -27,6 +29,10 @@ def SIGNEXT(x, b):
 
 def is_reg(op, regNo):
     return op.reg == regNo
+
+# is sp delta fixed by the user?
+def is_fixed_spd(ea):
+    return (get_aflags(ea) & AFL_FIXEDSPD) != 0
 
 
 class UnknownInstruction(Exception):
@@ -301,7 +307,6 @@ class riscv_processor_t(processor_t):
         self.init_instructions()
         self.init_registers()
         self.init_tables()
-        print('WE HERE')
 
         # available postfixes
         self.postfixs = ['.w', '.wu', '.d', '.s', '.x', '.l', '.lu']
@@ -1085,6 +1090,8 @@ class riscv_processor_t(processor_t):
     def handle_operand(self, insn, op, r):
         flags = get_flags(insn.ea)
         is_offs = is_off(flags, op.n)
+        dref_flag = dr_R if r else dr_W
+        def_arg = is_defarg(flags, op.n)
         optype = op.type
         feats = insn.get_canon_feature()
 
@@ -1094,6 +1101,15 @@ class riscv_processor_t(processor_t):
                 insn.add_cref(op.addr, op.offb, fl_CN)
             elif feats & CF_JUMP:
                 insn.add_cref(op.addr, op.offb, fl_JN)
+        elif optype == o_displ:
+            # delta(reg)
+            if is_offs:
+                insn.add_off_drefs(op, dref_flag, OOF_ADDR)
+            elif may_create_stkvars() and not def_arg and op.reg == self.ireg_sp:
+                # var_x(SP)
+                pfn = get_func(insn.ea)
+                if pfn and insn.create_stkvar(op, op.value, STKVAR_VALID_SIZE):
+                    op_stkvar(insn.ea, op.n)
 
     def init_instructions(self):
         i = 0
@@ -1218,9 +1234,11 @@ class riscv_processor_t(processor_t):
 
     # TODO: setup loader hooks and inject correct ELF type
     #def ev_init(self, idp_file):
+    #    return 0
 
-    #def ev_get_frame_retsize(self, func_ea):
-    #   return 4
+    def ev_get_frame_retsize(self, frsize, pfn):
+        ida_pro.int_pointer.frompointer(frsize).assign(0)
+        return 1
 
     # auto-comments are disabled
     def ev_get_autocmt(self, insn):
@@ -1232,6 +1250,28 @@ class riscv_processor_t(processor_t):
         if opcode in self.maj_opcodes or (opcode & RV_C_MASK != RV_C_MASK):
             return 1
         return -1
+    
+    def trace_sp(self, insn):
+        """
+        Trace the value of the SP and create an SP change point if the current
+        instruction modifies the SP.
+        """
+        pfn = get_func(insn.ea)
+        if not pfn:
+            return
+        spofs = 0
+        # have always seen `addi sp, sp, <simm>` used for prologue/epilogue
+        # `add/sub sp, sp, <reg>` used for variable sized arrays
+        if insn.itype == self.itype_addi and insn.Op1.is_reg(self.ireg_sp) and \
+            insn.Op2.is_reg(self.ireg_sp) and insn.Op3.type == o_imm:
+            spofs = insn.Op3.value
+            if insn.Op3.specflag1 & RV_OP_FLAG_SIGNED:
+                spofs = fix_sign_32(spofs)
+
+        if spofs != 0:
+            end = insn.ea + insn.size
+            if not is_fixed_spd(end):
+                ida_frame.add_auto_stkpnt(pfn, end, spofs)
 
     # emulate one instruction, used mainly to crefs and drefs
     # and to establish general program flow
@@ -1256,8 +1296,19 @@ class riscv_processor_t(processor_t):
             remember_problem(PR_JUMP, insn.ea)
 
         # flow, best part in IDAPro :D
-        if feats & CF_STOP == 0:
+        flow = feats & CF_STOP == 0
+        if flow:
             add_cref(insn.ea, insn.ea + insn.size, fl_F)
+        
+        # trace the stack pointer if:
+        #   - it is the second analysis pass
+        #   - the stack pointer tracing is allowed
+        if may_trace_sp():
+            if flow:
+                self.trace_sp(insn)     # trace modification of SP register
+            else:
+                idc.recalc_spd(insn.ea) # recalculate SP register for the next insn
+
         return True
 
     def ev_out_operand(self, ctx, op):
