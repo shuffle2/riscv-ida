@@ -556,7 +556,7 @@ class riscv_processor_t(processor_t):
             self.op_imm(insn.Op1, self.decode_i_imm(opcode, False))
             insn.itype = self.itype_fence
         else:
-            insn.itype = self.itype_fencei
+            insn.itype = self.itype_fence_i
 
     def decode_SYSTEM(self, insn, opcode):
         rd = self.decode_rd(opcode)
@@ -1266,7 +1266,7 @@ class riscv_processor_t(processor_t):
             ctx.out_register(self.reg_names[op.reg])
         elif optype == o_imm:
             if op.specflag1 & RV_OP_FLAG_CSR == RV_OP_FLAG_CSR:
-                ctx.out_register(self.csr_names[op.value])
+                ctx.out_register(self.csr_names.get(op.value, 'csr_%x' % (op.value)))
             else:
                 opflag = OOFW_IMM | OOFW_32 | OOF_NUMBER
                 if op.specflag1 & RV_OP_FLAG_SIGNED == RV_OP_FLAG_SIGNED:
