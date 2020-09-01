@@ -301,10 +301,7 @@ class riscv_processor_t(processor_t):
         self.init_instructions()
         self.init_registers()
         self.init_tables()
-        if __EA64__:
-            print "64bit\n"
-        else:
-            print "32bit"
+        print('WE HERE')
 
         # available postfixes
         self.postfixs = ['.w', '.wu', '.d', '.s', '.x', '.l', '.lu']
@@ -577,8 +574,7 @@ class riscv_processor_t(processor_t):
                 self.itype_csrrw, self.itype_csrrs, self.itype_csrrc, self.itype_null,
                 self.itype_csrrwi, self.itype_csrrsi, self.itype_csrrci
             ][funct3-1]
-            i = ord(insn.insnpref) | RV_INSN_CSR
-            insn.insnpref = chr(i)
+            insn.insnpref |= RV_INSN_CSR
             self.op_reg(insn.Op1, self.decode_rd(opcode))
             if funct3 <= 3:
                 self.op_reg(insn.Op3, rs1_zimm)
@@ -960,7 +956,7 @@ class riscv_processor_t(processor_t):
 
         if insn.itype != self.itype_null:
             return insn.size
-        print "returning unknown for 0x%08x" % (insn.ea)
+        print("returning unknown for 0x%08x" % (insn.ea))
         return 0
 
     def decode_normal(self, insn):
@@ -973,7 +969,7 @@ class riscv_processor_t(processor_t):
                 raise UnknownInstruction()
             return insn.size
         except (KeyError, UnknownInstruction) as e:
-            print "error: 0x%08x - %s" % (insn.ea, str(e))
+            print("error: 0x%08x - %s" % (insn.ea, str(e)))
             return 0
 
     # rewrite one instruction into a simpler form
@@ -1057,7 +1053,7 @@ class riscv_processor_t(processor_t):
             insn.Op1.assign(insn.Op2)
             insn.Op2.assign(insn.Op3)
             insn.Op3.type = o_void
-        elif ord(insn.insnpref) & RV_INSN_CSR == RV_INSN_CSR:
+        elif insn.insnpref & RV_INSN_CSR == RV_INSN_CSR:
             csr = insn.Op2.value
 
             # these CSRs produce a pseudo-instruction rdXXX
@@ -1137,7 +1133,7 @@ class riscv_processor_t(processor_t):
             'vDS'  # fake ds
         ]
 
-        for i in xrange(len(self.reg_names)):
+        for i in range(len(self.reg_names)):
             setattr(self, 'ireg_' + self.reg_names[i], i)
 
         self.reg_first_sreg = self.ireg_vCS
@@ -1162,7 +1158,7 @@ class riscv_processor_t(processor_t):
         ]
 
     def init_csrs(self):
-        for i in xrange(3, 32):
+        for i in range(3, 32):
             self.csr_names[0xC00+i] = "hpmcounter%d" % (i)
             self.csr_names[0xC80+i] = "hpmcounter%dh" % (i)
 
@@ -1221,17 +1217,17 @@ class riscv_processor_t(processor_t):
         ]
 
     # TODO: setup loader hooks and inject correct ELF type
-    #def notify_init(self, idp_file):
+    #def ev_init(self, idp_file):
 
-    #def notify_get_frame_retsize(self, func_ea):
+    #def ev_get_frame_retsize(self, func_ea):
     #   return 4
 
     # auto-comments are disabled
-    def notify_get_autocmt(self, insn):
-        pass
+    def ev_get_autocmt(self, insn):
+        return 0
 
     # verify if this instruction is acceptable
-    def notify_is_sane_insn(self, insn, no_crefs):
+    def ev_is_sane_insn(self, insn, no_crefs):
         opcode = get_byte(insn.ea) & RV_MAJ_OPCODE_MASK
         if opcode in self.maj_opcodes or (opcode & RV_C_MASK != RV_C_MASK):
             return 1
@@ -1240,7 +1236,7 @@ class riscv_processor_t(processor_t):
     # emulate one instruction, used mainly to crefs and drefs
     # and to establish general program flow
     # TODO: add stack tracing
-    def notify_emu(self, insn):
+    def ev_emu_insn(self, insn):
         feats = insn.get_canon_feature()
 
         if feats & CF_USE1:
@@ -1262,9 +1258,9 @@ class riscv_processor_t(processor_t):
         # flow, best part in IDAPro :D
         if feats & CF_STOP == 0:
             add_cref(insn.ea, insn.ea + insn.size, fl_F)
-        return 1
+        return True
 
-    def notify_out_operand(self, ctx, op):
+    def ev_out_operand(self, ctx, op):
         optype = op.type
         if optype == o_reg:
             ctx.out_register(self.reg_names[op.reg])
@@ -1288,7 +1284,7 @@ class riscv_processor_t(processor_t):
             return False
         return True
 
-    def out_mnem(self, ctx):
+    def ev_out_mnem(self, ctx):
         auxpref = ctx.insn.auxpref
         postfix = ""
 
@@ -1306,8 +1302,9 @@ class riscv_processor_t(processor_t):
                 postfix += ".rl"
 
         ctx.out_mnem(14, postfix)
+        return 1
 
-    def notify_out_insn(self, ctx):
+    def ev_out_insn(self, ctx):
         # nothing special to be done here
         ctx.out_mnemonic()
 
@@ -1316,7 +1313,7 @@ class riscv_processor_t(processor_t):
         if ctx.insn.Op1.type != o_void:
             ctx.out_one_operand(0)
 
-        for i in xrange(1,4):
+        for i in range(1,4):
             if ctx.insn[i].type == o_void:
                 break
             ctx.out_symbol(',')
@@ -1324,7 +1321,7 @@ class riscv_processor_t(processor_t):
             ctx.out_one_operand(i)
         ctx.flush_outbuf()
 
-    def notify_ana(self, insn):
+    def ev_ana_insn(self, insn):
         # instructions must be aligned
         # TODO: check for eventual CPU features in cfg?
         if (insn.ea & 1) != 0:
@@ -1332,7 +1329,7 @@ class riscv_processor_t(processor_t):
 
         # some default values
         insn.auxpref = RV_AUX_NOPOST
-        insn.insnpref = ''
+        insn.insnpref = 0
         insn.itype = self.itype_null
 
         # determine if this is a compressed instruction
